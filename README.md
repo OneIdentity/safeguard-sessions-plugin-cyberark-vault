@@ -1,4 +1,4 @@
-# safeguard-sessions-plugin-aamcp
+# safeguard-sessions-plugin-cyberark-vault
 Cyberark Vault plugin for Safeguard for Privileged Sessions
 
 # Support
