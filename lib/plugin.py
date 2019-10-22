@@ -19,7 +19,8 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 #
-
+from requests.exceptions import RequestException
+from safeguard.sessions.plugin.exceptions import PluginSDKRuntimeError
 from safeguard.sessions.plugin.credentialstore_plugin import CredentialStorePlugin
 from .client import Client
 
@@ -27,9 +28,13 @@ from .client import Client
 class Plugin(CredentialStorePlugin):
 
     def do_get_password_list(self):
-        vault_client = Client.create(
-            self.plugin_configuration,
-            self.connection.gateway_username,
-            self.connection.gateway_password
-        )
-        return vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
+        try:
+            vault_client = Client.create(
+                self.plugin_configuration,
+                self.connection.gateway_username,
+                self.connection.gateway_password
+            )
+            return vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
+        except (PluginSDKRuntimeError, RequestException) as ex:
+            self.logger.error("Error retrieving passwords: {}".format(ex))
+            return None
