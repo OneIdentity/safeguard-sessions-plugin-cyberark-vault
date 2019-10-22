@@ -19,9 +19,9 @@
 # FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
 # IN THE SOFTWARE.
 #
-
-import requests
+import abc
 import json
+import requests
 from safeguard.sessions.plugin.requests_tls import RequestsTLS
 from safeguard.sessions.plugin.logging import get_logger
 
@@ -33,11 +33,12 @@ class CyberarkException(Exception):
 
 
 class Client:
-    def __init__(self, requests_tls, address_url, username, password):
+    def __init__(self, requests_tls, address_url, username, password, authenticator):
         self.__requests_tls = requests_tls
         self.__address_url = address_url
         self.__username = username
         self.__password = password
+        self.__authenticator = authenticator
 
     @classmethod
     def from_config(cls, config):
@@ -46,30 +47,25 @@ class Client:
                                    config.get('cyberark', 'address', required=True))
         username = config.get('cyberark', 'username')
         password = config.get('cyberark', 'password')
-        return Client(requests_tls, address_url, username, password)
+        return Client(
+            requests_tls=requests_tls,
+            address_url=address_url,
+            username=username,
+            password=password,
+            authenticator=AuthenticatorFactory.create(config)
+        )
 
     def get_passwords(self, account, asset, gateway_username):
         with self.__requests_tls.open_session() as session:
-            auth_token = self.__authenticate(session)
+            auth_token = self.__authenticator.authenticate(
+                session,
+                self.__address_url,
+                self.__username,
+                self.__password
+            )
             passwords = self.__get_passwords(session, auth_token, account, asset, gateway_username)
+            self.__authenticator.logoff(session, self.__address_url)
         return passwords
-
-    def __authenticate(self, session):
-        auth_post_data = {
-            'username': self.__username,
-            'password': self.__password,
-            'useRadiusAuthentication': False,
-            'connectionNumber': '1'
-        }
-        return _extract_data_from_endpoint(
-            session,
-            endpoint_url=self.__address_url + '/PasswordVault/WebServices/auth/Cyberark/'
-                                              'CyberArkAuthenticationService.svc/Logon',
-            headers={'Content-Type': 'application/json'},
-            method='post',
-            field_name='CyberArkLogonResult',
-            data=auth_post_data
-        )
 
     def __get_passwords(self, session, auth_token, account, asset, gateway_username):
         headers = {'Content-Type': 'application/json', 'Authorization': auth_token}
@@ -103,7 +99,7 @@ class Client:
 
 
 def _extract_data_from_endpoint(session, endpoint_url, headers, method, field_name=None, data=None):
-    logger.debug('Sending http request to Cyberark Vault, endpoint_url="{}", method="{}"'
+    logger.debug('Sending http request to CyberArk Vault, endpoint_url="{}", method="{}"'
                  .format(endpoint_url, method))
     try:
         response = session.get(endpoint_url, headers=headers) if method == 'get' \
@@ -115,5 +111,108 @@ def _extract_data_from_endpoint(session, endpoint_url, headers, method, field_na
         content = json.loads(response.text)
         return content.get(field_name) if field_name else content
     else:
-        raise CyberarkException('Received error from Cyberark Vault: {}'
+        raise CyberarkException('Received error from CyberArk Vault: {}'
                                 .format(json.loads(response.text).get('ErrorMessage')))
+
+
+class AuthenticatorFactory:
+    @classmethod
+    def create(cls, config):
+        authentication_method = config.getienum(
+            'cyberark',
+            'authentication_method',
+            value_set=V9Authenticator.TYPES + V10Authenticator.TYPES,
+            default='legacy'
+        )
+        if authentication_method in V9Authenticator.TYPES:
+            return V9Authenticator(authentication_method)
+        else:
+            return V10Authenticator(authentication_method)
+
+
+class Authenticator:
+    def __init__(self, auth_type):
+        self._authorization = None
+        self._type = auth_type
+
+    @abc.abstractmethod
+    def authenticate(self, session, base_url, username, password):
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def logoff(self, session, base_url):
+        raise NotImplementedError()
+
+    def common_logoff(self, session, url):
+        if self._authorization is None:
+            return
+        logger.debug('Logoff from CyberArk Vault; url={}'.format(url))
+        try:
+            response = session.post(
+                url,
+                headers={
+                    'Content-Type': 'application/json',
+                    'Authorization': self._authorization
+                }
+            )
+            if not response.ok:
+                logger.warning('Logoff from CyberArk Vault failed; status={}'.format(response.status_code))
+        except requests.exceptions.RequestException as ex:
+            logger.warning('Logoff from CyberArk Vault failed; exception={}'.format(ex))
+
+
+class V9Authenticator(Authenticator):
+    TYPES = ('legacy',)
+
+    def authenticate(self, session, base_url, username, password):
+        auth_post_data = {
+            'username': username,
+            'password': password,
+            'useRadiusAuthentication': False,
+            'connectionNumber': '1'
+        }
+        self._authorization = _extract_data_from_endpoint(
+            session,
+            endpoint_url=base_url + '/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logon',
+            headers={'Content-Type': 'application/json'},
+            method='post',
+            field_name='CyberArkLogonResult',
+            data=auth_post_data
+        )
+        return self._authorization
+
+    def logoff(self, session, base_url):
+        self.common_logoff(
+            session,
+            base_url + '/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logoff'
+        )
+
+
+class V10Authenticator(Authenticator):
+    TYPES = ('cyberark', 'ldap', 'radius', 'windows')
+    TYPE_TO_ENDPOINT = {
+        'cyberark': 'CyberArk',
+        'ldap': 'LDAP',
+        'radius': 'radius',
+        'windows': 'Windows'
+    }
+
+    def authenticate(self, session, base_url, username, password):
+        auth_post_data = {
+            'username': username,
+            'password': password
+        }
+        self._authorization = _extract_data_from_endpoint(
+            session,
+            endpoint_url=base_url + '/PasswordVault/API/Auth/{}/Logon'.format(self.TYPE_TO_ENDPOINT[self._type]),
+            headers={'Content-Type': 'application/json'},
+            method='post',
+            data=auth_post_data
+        )
+        return self._authorization
+
+    def logoff(self, session, base_url):
+        self.common_logoff(
+            session,
+            base_url + '/PasswordVault/API/Auth/Logoff'
+        )
