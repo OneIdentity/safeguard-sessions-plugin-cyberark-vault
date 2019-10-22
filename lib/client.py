@@ -22,6 +22,7 @@
 import abc
 import json
 import requests
+from safeguard.sessions.plugin.exceptions import PluginSDKRuntimeError
 from safeguard.sessions.plugin.requests_tls import RequestsTLS
 from safeguard.sessions.plugin.logging import get_logger
 
@@ -41,12 +42,13 @@ class Client:
         self.__authenticator = authenticator
 
     @classmethod
-    def from_config(cls, config):
+    def create(cls, config, gateway_username, gateway_password):
         requests_tls = RequestsTLS.from_config(config)
         address_url = '{}://{}'.format('https' if requests_tls.tls_enabled else 'http',
                                    config.get('cyberark', 'address', required=True))
-        username = config.get('cyberark', 'username')
-        password = config.get('cyberark', 'password')
+
+        (username, password) = cls.get_username_password(config, gateway_username, gateway_password)
+
         return Client(
             requests_tls=requests_tls,
             address_url=address_url,
@@ -54,6 +56,23 @@ class Client:
             password=password,
             authenticator=AuthenticatorFactory.create(config)
         )
+
+    @classmethod
+    def get_username_password(cls, config, gateway_username, gateway_password):
+        use_credential = config.getienum('cyberark', 'use_credential', ('explicit', 'gateway'), default='gateway')
+        if use_credential == 'explicit':
+            return config.get('cyberark', 'username', required=True), config.get('cyberark', 'password', required=True)
+        else:
+            if gateway_username and gateway_password:
+                return gateway_username, gateway_password
+            else:
+                raise PluginSDKRuntimeError(
+                    "Gateway username or password undefined and use_credentials is set to gateway",
+                    {
+                        "gateway_username": "N/A" if not gateway_username else gateway_username,
+                        "gateway_password": "N/A" if not gateway_password else "(hidden)"
+                    }
+                )
 
     def get_passwords(self, account, asset, gateway_username):
         with self.__requests_tls.open_session() as session:

@@ -73,6 +73,7 @@ def cy_config(site_parameters):
     yield dedent("""
         [cyberark]
         address = {address}
+        use_credential=explicit
         username = {username}
         password = {password}
     """.format(

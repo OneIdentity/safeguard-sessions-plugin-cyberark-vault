@@ -80,6 +80,7 @@ def test_v10_ldap_logon(cy_address, cy_ldap_username, cy_ldap_password, cy_accou
     config = dedent("""
         [cyberark]
         address={}
+        use_credential=explicit
         username={}
         password={}
         authentication_method=ldap

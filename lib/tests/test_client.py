@@ -29,7 +29,8 @@ from textwrap import dedent
 from contextlib import contextmanager
 
 from ..client import AuthenticatorFactory, Client, CyberarkException, V9Authenticator
-from safeguard.sessions.plugin.plugin_configuration import PluginConfiguration
+from safeguard.sessions.plugin.exceptions import PluginSDKRuntimeError
+from safeguard.sessions.plugin.plugin_configuration import PluginConfiguration, RequiredConfigurationSettingNotFound
 
 Response = namedtuple('Response', 'ok text')
 
@@ -70,9 +71,18 @@ VAULT_PASSWORD = 'password'
 CYBERARK_VAULT_CONFIG = dedent(f'''
     [cyberark]
     address = {ADDRESS}
+    use_credential=explicit
     username = {VAULT_USERNAME}
     password = {VAULT_PASSWORD}
 ''')
+
+
+CYBERARK_VAULT_GW_CONFIG = dedent(f'''
+    [cyberark]
+    address = {ADDRESS}
+    use_credential=gateway
+''')
+
 
 URL = 'http://{}'.format(ADDRESS)
 LOGON_ENDPOINT = URL + '/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logon'
@@ -121,7 +131,7 @@ DEFAULT_AUTHENTICATOR = V9Authenticator('legacy')
 
 
 def test_can_instantiate_client_from_config():
-    client = Client.from_config(PluginConfiguration(CYBERARK_VAULT_CONFIG))
+    client = Client.create(PluginConfiguration(CYBERARK_VAULT_CONFIG), None, None)
     assert isinstance(client, Client)
 
 
@@ -132,9 +142,22 @@ def test_client_uses_https_when_tls_is_enabled(_requests_tls, _authenticator_cre
     https_url = 'https://{}'.format(ADDRESS)
     config = PluginConfiguration(CYBERARK_VAULT_CONFIG)
     mocker.spy(Client, '__init__')
-    client = Client.from_config(config)
+    client = Client.create(config, None, None)
     client.__init__.assert_called_with(
         client, REQUESTS_TLS, https_url, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR
+    )
+
+
+@patch('safeguard.sessions.plugin.requests_tls.RequestsTLS', return_value=REQUESTS_TLS)
+@patch.object(AuthenticatorFactory, 'create', return_value=DEFAULT_AUTHENTICATOR)
+def test_client_uses_gateway_user_when_configured(_requests_tls, _authenticator_creator, mocker):
+    REQUESTS_TLS.tls_enabled = True
+    https_url = 'https://{}'.format(ADDRESS)
+    config = PluginConfiguration(CYBERARK_VAULT_GW_CONFIG)
+    mocker.spy(Client, '__init__')
+    client = Client.create(config, "a_gateway_user", "a_gateway_password")
+    client.__init__.assert_called_with(
+        client, REQUESTS_TLS, https_url, "a_gateway_user", "a_gateway_password", DEFAULT_AUTHENTICATOR
     )
 
 
@@ -242,3 +265,62 @@ def test_cannot_find_object_based_on_username_and_asset():
     SESSION.get.return_value = NO_OBJECTS_FOUND_RESPONSE
     client = Client(REQUESTS_TLS, 'http://' + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
     assert client.get_passwords(account='dummy', asset='1.2.3.4', gateway_username='dummy') == {'passwords': []}
+
+
+def test_userpass_calc_default():
+    config = PluginConfiguration("")
+    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
+    assert (username, password) == ("a_gateway_user", "a_gateway_password")
+
+
+def test_userpass_calc_gateway():
+    config = PluginConfiguration(dedent("""
+        [cyberark]
+        use_credential=gateway
+        username=admin_user
+        password=admin_pwd
+    """))
+    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
+    assert (username, password) == ("a_gateway_user", "a_gateway_password")
+
+
+def test_userpass_calc_gateway_missing_password():
+    config = PluginConfiguration(dedent("""
+        [cyberark]
+        use_credential=gateway
+        username=admin_user
+        password=admin_pwd
+    """))
+    with raises(PluginSDKRuntimeError):
+        Client.get_username_password(config, "a_gateway_user", "")
+
+
+def test_userpass_calc_explicit():
+    config = PluginConfiguration(dedent("""
+        [cyberark]
+        use_credential = explicit
+        username = admin_user
+        password = admin_password
+    """))
+    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
+    assert (username, password) == ("admin_user", "admin_password")
+
+
+def test_userpass_calc_explicit_missing_user():
+    config = PluginConfiguration(dedent("""
+        [cyberark]
+        use_credential = explicit
+        password = admin_password
+    """))
+    with raises(RequiredConfigurationSettingNotFound):
+        Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
+
+
+def test_userpass_calc_explicit_missing_pwd():
+    config = PluginConfiguration(dedent("""
+        [cyberark]
+        use_credential = explicit
+        username = admin_user
+    """))
+    with raises(RequiredConfigurationSettingNotFound):
+        Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
