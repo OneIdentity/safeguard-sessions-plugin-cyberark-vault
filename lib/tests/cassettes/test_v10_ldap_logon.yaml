@@ -1,45 +1,47 @@
 interactions:
 - request:
-    body: '{"username": "PAG", "password": "3273skeR", "useRadiusAuthentication":
-      false, "connectionNumber": "1"}'
+    body: '{"username": "cark_admin", "password": "Secret88"}'
     headers:
       Accept: ['*/*']
       Accept-Encoding: ['gzip, deflate']
       Connection: [keep-alive]
-      Content-Length: ['102']
+      Content-Length: ['50']
       Content-Type: [application/json]
       User-Agent: [python-requests/2.18.4]
     method: POST
-    uri: https://10.12.226.151/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logon
+    uri: https://10.12.226.151/PasswordVault/API/Auth/LDAP/Logon
   response:
-    body: {string: '{"CyberArkLogonResult":"MDVhNTUzNGMtYjFjYi00ZTVkLTk1MTQtZjc0YWEyMjhiNzNkOzMwQzI0NDZDNkY2NkNDQzU7MDAwMDAwMDJBRDYwOENERUMyMjA0MDU2NTk0N0Q1RDdGODEzMjQ1RUI0NzM2Q0QzMkRGODVFRkE2ODJEMDlCNTlCQjdBMThCMDAwMDAwMDA7"}'}
+    body: {string: '"MzcwZDhlZTItYWFkMC00ZmEyLWE3MzQtYThmYWM2NDljYjkzOzZERDBFOTAwODhGQjMyRTY7MDAwMDAwMDI3OTM0RDcwREQzMDc5QTlFN0EyODM1QTFGMzY5QTMxRjZDMjI5MzMxMDA3RTExNjU0QjdGNzc5MEQ2RjRFQjU2MDAwMDAwMDA7"'}
     headers:
       Access-Control-Expose-Headers: [Warning]
       Cache-Control: ['no-cache, no-store, must-revalidate']
-      Content-Length: ['206']
+      Content-Length: ['182']
       Content-Type: [application/json; charset=utf-8]
-      Date: ['Tue, 22 Oct 2019 12:00:16 GMT']
+      Date: ['Tue, 22 Oct 2019 12:00:18 GMT']
       Expires: ['-1']
       Pragma: [no-cache]
       Server: [Microsoft-IIS/8.5]
-      Set-Cookie: [CA22222=; path=/PasswordVault/; secure; HttpOnly, CA11111=; path=/PasswordVault/;
-          secure; HttpOnly, CA55555=; path=/PasswordVault/; secure, CA33333=; path=/PasswordVault/;
-          secure; HttpOnly, mobileState=Desktop; path=/PasswordVault/; secure; HttpOnly]
+      Set-Cookie: [CA33333=; path=/PasswordVault/; secure; HttpOnly, mobileState=Desktop;
+          path=/PasswordVault/; secure; HttpOnly, CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          path=/PasswordVault/; secure; HttpOnly, CA22222=6DD0E90088FB32E6; path=/PasswordVault/;
+          secure; HttpOnly, CA55555=ldap; path=/PasswordVault/; secure; HttpOnly]
       Strict-Transport-Security: [max-age=31536000; includeSubDomains]
       X-Content-Type-Options: [nosniff]
       X-FRAME-Options: [SAMEORIGIN]
       X-UA-Compatible: [IE=EmulateIE8]
       X-XSS-Protection: [1; mode=block]
+      api-supported-versions: ['10.7']
     status: {code: 200, message: OK}
 - request:
     body: null
     headers:
       Accept: ['*/*']
       Accept-Encoding: ['gzip, deflate']
-      Authorization: [MDVhNTUzNGMtYjFjYi00ZTVkLTk1MTQtZjc0YWEyMjhiNzNkOzMwQzI0NDZDNkY2NkNDQzU7MDAwMDAwMDJBRDYwOENERUMyMjA0MDU2NTk0N0Q1RDdGODEzMjQ1RUI0NzM2Q0QzMkRGODVFRkE2ODJEMDlCNTlCQjdBMThCMDAwMDAwMDA7]
+      Authorization: [MzcwZDhlZTItYWFkMC00ZmEyLWE3MzQtYThmYWM2NDljYjkzOzZERDBFOTAwODhGQjMyRTY7MDAwMDAwMDI3OTM0RDcwREQzMDc5QTlFN0EyODM1QTFGMzY5QTMxRjZDMjI5MzMxMDA3RTExNjU0QjdGNzc5MEQ2RjRFQjU2MDAwMDAwMDA7]
       Connection: [keep-alive]
       Content-Type: [application/json]
-      Cookie: [CA11111=; CA22222=; CA33333=; CA55555=; mobileState=Desktop]
+      Cookie: [CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          CA22222=6DD0E90088FB32E6; CA33333=; CA55555=ldap; mobileState=Desktop]
       User-Agent: [python-requests/2.18.4]
     method: GET
     uri: https://10.12.226.151/PasswordVault/api/Accounts?search=admin,192.168.103.11&sort=UserName
@@ -50,13 +52,15 @@ interactions:
       Cache-Control: ['no-cache, no-store, must-revalidate']
       Content-Length: ['423']
       Content-Type: [application/json; charset=utf-8]
-      Date: ['Tue, 22 Oct 2019 12:00:16 GMT']
+      Date: ['Tue, 22 Oct 2019 12:00:18 GMT']
       Expires: ['-1']
       Pragma: [no-cache]
       Server: [Microsoft-IIS/8.5]
-      Set-Cookie: [CA22222=; path=/PasswordVault/; secure; HttpOnly, CA11111=; path=/PasswordVault/;
-          secure; HttpOnly, CA55555=; path=/PasswordVault/; secure, CA33333=; path=/PasswordVault/;
-          secure; HttpOnly, mobileState=Desktop; path=/PasswordVault/; secure; HttpOnly]
+      Set-Cookie: [CA22222=6DD0E90088FB32E6; path=/PasswordVault/; secure; HttpOnly,
+        CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          path=/PasswordVault/; secure; HttpOnly, CA55555=ldap; path=/PasswordVault/;
+          secure, CA33333=; path=/PasswordVault/; secure; HttpOnly, mobileState=Desktop;
+          path=/PasswordVault/; secure; HttpOnly]
       Strict-Transport-Security: [max-age=31536000; includeSubDomains]
       X-Content-Type-Options: [nosniff]
       X-FRAME-Options: [SAMEORIGIN]
@@ -70,11 +74,12 @@ interactions:
     headers:
       Accept: ['*/*']
       Accept-Encoding: ['gzip, deflate']
-      Authorization: [MDVhNTUzNGMtYjFjYi00ZTVkLTk1MTQtZjc0YWEyMjhiNzNkOzMwQzI0NDZDNkY2NkNDQzU7MDAwMDAwMDJBRDYwOENERUMyMjA0MDU2NTk0N0Q1RDdGODEzMjQ1RUI0NzM2Q0QzMkRGODVFRkE2ODJEMDlCNTlCQjdBMThCMDAwMDAwMDA7]
+      Authorization: [MzcwZDhlZTItYWFkMC00ZmEyLWE3MzQtYThmYWM2NDljYjkzOzZERDBFOTAwODhGQjMyRTY7MDAwMDAwMDI3OTM0RDcwREQzMDc5QTlFN0EyODM1QTFGMzY5QTMxRjZDMjI5MzMxMDA3RTExNjU0QjdGNzc5MEQ2RjRFQjU2MDAwMDAwMDA7]
       Connection: [keep-alive]
       Content-Length: ['146']
       Content-Type: [application/json]
-      Cookie: [CA11111=; CA22222=; CA33333=; CA55555=; mobileState=Desktop]
+      Cookie: [CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          CA22222=6DD0E90088FB32E6; CA33333=; CA55555=ldap; mobileState=Desktop]
       User-Agent: [python-requests/2.18.4]
     method: POST
     uri: https://10.12.226.151/PasswordVault/api/Accounts/30_4/Password/Retrieve
@@ -85,13 +90,15 @@ interactions:
       Cache-Control: ['no-cache, no-store, must-revalidate']
       Content-Length: ['10']
       Content-Type: [text/html; charset=utf-8]
-      Date: ['Tue, 22 Oct 2019 12:00:17 GMT']
+      Date: ['Tue, 22 Oct 2019 12:00:20 GMT']
       Expires: ['-1']
       Pragma: [no-cache]
       Server: [Microsoft-IIS/8.5]
-      Set-Cookie: [CA22222=; path=/PasswordVault/; secure; HttpOnly, CA11111=; path=/PasswordVault/;
-          secure; HttpOnly, CA55555=; path=/PasswordVault/; secure, CA33333=; path=/PasswordVault/;
-          secure; HttpOnly, mobileState=Desktop; path=/PasswordVault/; secure; HttpOnly]
+      Set-Cookie: [CA22222=6DD0E90088FB32E6; path=/PasswordVault/; secure; HttpOnly,
+        CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          path=/PasswordVault/; secure; HttpOnly, CA55555=ldap; path=/PasswordVault/;
+          secure, CA33333=; path=/PasswordVault/; secure; HttpOnly, mobileState=Desktop;
+          path=/PasswordVault/; secure; HttpOnly]
       Strict-Transport-Security: [max-age=31536000; includeSubDomains]
       X-Content-Type-Options: [nosniff]
       X-FRAME-Options: [SAMEORIGIN]
@@ -104,32 +111,36 @@ interactions:
     headers:
       Accept: ['*/*']
       Accept-Encoding: ['gzip, deflate']
-      Authorization: [MDVhNTUzNGMtYjFjYi00ZTVkLTk1MTQtZjc0YWEyMjhiNzNkOzMwQzI0NDZDNkY2NkNDQzU7MDAwMDAwMDJBRDYwOENERUMyMjA0MDU2NTk0N0Q1RDdGODEzMjQ1RUI0NzM2Q0QzMkRGODVFRkE2ODJEMDlCNTlCQjdBMThCMDAwMDAwMDA7]
+      Authorization: [MzcwZDhlZTItYWFkMC00ZmEyLWE3MzQtYThmYWM2NDljYjkzOzZERDBFOTAwODhGQjMyRTY7MDAwMDAwMDI3OTM0RDcwREQzMDc5QTlFN0EyODM1QTFGMzY5QTMxRjZDMjI5MzMxMDA3RTExNjU0QjdGNzc5MEQ2RjRFQjU2MDAwMDAwMDA7]
       Connection: [keep-alive]
       Content-Length: ['0']
       Content-Type: [application/json]
-      Cookie: [CA11111=; CA22222=; CA33333=; CA55555=; mobileState=Desktop]
+      Cookie: [CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          CA22222=6DD0E90088FB32E6; CA33333=; CA55555=ldap; mobileState=Desktop]
       User-Agent: [python-requests/2.18.4]
     method: POST
-    uri: https://10.12.226.151/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logoff
+    uri: https://10.12.226.151/PasswordVault/API/Auth/Logoff
   response:
-    body: {string: '{}'}
+    body: {string: '{"LogoffUrl":""}'}
     headers:
       Access-Control-Expose-Headers: [Warning]
       Cache-Control: ['no-cache, no-store, must-revalidate']
-      Content-Length: ['2']
+      Content-Length: ['16']
       Content-Type: [application/json; charset=utf-8]
-      Date: ['Tue, 22 Oct 2019 12:00:17 GMT']
+      Date: ['Tue, 22 Oct 2019 12:00:20 GMT']
       Expires: ['-1']
       Pragma: [no-cache]
       Server: [Microsoft-IIS/8.5]
-      Set-Cookie: [CA22222=; path=/PasswordVault/; secure; HttpOnly, CA11111=; path=/PasswordVault/;
-          secure; HttpOnly, CA55555=; path=/PasswordVault/; secure, CA33333=; path=/PasswordVault/;
-          secure; HttpOnly, mobileState=Desktop; path=/PasswordVault/; secure; HttpOnly]
+      Set-Cookie: [CA22222=6DD0E90088FB32E6; path=/PasswordVault/; secure; HttpOnly,
+        CA11111=000000027934D70DD3079A9E7A2835A1F369A31F6C229331007E11654B7F7790D6F4EB5600000000;
+          path=/PasswordVault/; secure; HttpOnly, CA55555=ldap; path=/PasswordVault/;
+          secure, CA33333=; path=/PasswordVault/; secure; HttpOnly, mobileState=Desktop;
+          path=/PasswordVault/; secure; HttpOnly]
       Strict-Transport-Security: [max-age=31536000; includeSubDomains]
       X-Content-Type-Options: [nosniff]
       X-FRAME-Options: [SAMEORIGIN]
       X-UA-Compatible: [IE=EmulateIE8]
       X-XSS-Protection: [1; mode=block]
+      api-supported-versions: ['10.7']
     status: {code: 200, message: OK}
 version: 1

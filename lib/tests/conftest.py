@@ -39,6 +39,16 @@ def cy_password(site_parameters):
 
 
 @pytest.fixture
+def cy_ldap_username(site_parameters):
+    return site_parameters['ldap_username']
+
+
+@pytest.fixture
+def cy_ldap_password(site_parameters):
+    return site_parameters['ldap_password']
+
+
+@pytest.fixture
 def cy_account(site_parameters):
     return site_parameters['account']
 
@@ -63,6 +73,7 @@ def cy_config(site_parameters):
     yield dedent("""
         [cyberark]
         address = {address}
+        use_credential=explicit
         username = {username}
         password = {password}
     """.format(

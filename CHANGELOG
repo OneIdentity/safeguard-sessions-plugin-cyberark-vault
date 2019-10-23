@@ -1,3 +1,13 @@
+1.1.0 2019-10-23
+
+Default authentication to CyberArk Vault now tries to use the gateway username and password, to change this
+behaviour enter explicit to the use_credential parameter.
+
+Added V10 API authentication methods, configured via the authentication_method parameter. The default is the previous
+legacy V9 API method.
+
+Changed exception handling to avoid expected traces and log only.
+
 1.0.0 2019-09-04
 
 Initial release.

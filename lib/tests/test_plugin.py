@@ -33,6 +33,7 @@ def configured_plugin():
     config = dedent('''
         [cyberark]
         address = test.vault
+        use_credential=explicit
         username = vault_user
         password = vault_pwd
     ''')
