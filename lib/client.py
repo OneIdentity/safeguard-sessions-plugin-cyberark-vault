@@ -45,7 +45,7 @@ class Client:
     def create(cls, config, gateway_username, gateway_password):
         requests_tls = RequestsTLS.from_config(config)
         address_url = '{}://{}'.format('https' if requests_tls.tls_enabled else 'http',
-                                   config.get('cyberark', 'address', required=True))
+                                       config.get('cyberark', 'address', required=True))
 
         (username, password) = cls.get_username_password(config, gateway_username, gateway_password)
 
