@@ -26,13 +26,10 @@ from .client import Client
 
 
 class Plugin(CredentialStorePlugin):
-
     def do_get_password_list(self):
         try:
             vault_client = Client.create(
-                self.plugin_configuration,
-                self.connection.gateway_username,
-                self.connection.gateway_password
+                self.plugin_configuration, self.connection.gateway_username, self.connection.gateway_password
             )
             return vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
         except (PluginSDKRuntimeError, RequestException) as ex:
