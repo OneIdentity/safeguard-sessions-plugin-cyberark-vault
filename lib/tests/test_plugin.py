@@ -30,49 +30,43 @@ from ..plugin import Plugin
 
 @fixture
 def configured_plugin():
-    config = dedent('''
+    config = dedent(
+        """
         [cyberark]
         address = test.vault
         use_credential=explicit
         username = vault_user
         password = vault_pwd
-    ''')
+    """
+    )
     return Plugin(config)
 
 
-@patch('lib.client.Client.get_passwords', return_value={'passwords': ['password']})
+@patch("lib.client.Client.get_passwords", return_value={"passwords": ["password"]})
 def test_do_get_password_list(client, configured_plugin):
-    username = 'wsmith'
-    server = '1.2.3.4'
-    gateway_user = 'jsmith'
+    username = "wsmith"
+    server = "1.2.3.4"
+    gateway_user = "jsmith"
     password_list = configured_plugin.get_password_list(
         cookie=dict(),
         session_cookie=dict(),
         target_username=username,
         target_server=server,
         gateway_username=gateway_user,
-        protocol='SSH'
+        protocol="SSH",
     )
     client.assert_called_with(username, server, gateway_user)
-    assert_plugin_hook_result(
-        password_list,
-        dict(cookie=dict(account=username, asset=server),
-             passwords=['password'])
-    )
+    assert_plugin_hook_result(password_list, dict(cookie=dict(account=username, asset=server), passwords=["password"]))
 
 
-@patch('lib.client.Client.get_passwords', return_value=[])
+@patch("lib.client.Client.get_passwords", return_value=[])
 def test_getting_password_for_unknown_user(_client, configured_plugin):
     password_list = configured_plugin.get_password_list(
         cookie=dict(),
         session_cookie=dict(),
-        target_username='unknown',
-        target_server='unknown',
-        gateway_username='unknown',
-        protocol='SSH'
+        target_username="unknown",
+        target_server="unknown",
+        gateway_username="unknown",
+        protocol="SSH",
     )
-    assert_plugin_hook_result(
-        password_list,
-        dict(cookie=dict(account=None, asset=None),
-             passwords=[])
-    )
+    assert_plugin_hook_result(password_list, dict(cookie=dict(account=None, asset=None), passwords=[]))

@@ -25,59 +25,61 @@ import pytest
 
 @pytest.fixture
 def cy_address(site_parameters):
-    return site_parameters['address']
+    return site_parameters["address"]
 
 
 @pytest.fixture
 def cy_username(site_parameters):
-    return site_parameters['username']
+    return site_parameters["username"]
 
 
 @pytest.fixture
 def cy_password(site_parameters):
-    return site_parameters['password']
+    return site_parameters["password"]
 
 
 @pytest.fixture
 def cy_ldap_username(site_parameters):
-    return site_parameters['ldap_username']
+    return site_parameters["ldap_username"]
 
 
 @pytest.fixture
 def cy_ldap_password(site_parameters):
-    return site_parameters['ldap_password']
+    return site_parameters["ldap_password"]
 
 
 @pytest.fixture
 def cy_account(site_parameters):
-    return site_parameters['account']
+    return site_parameters["account"]
 
 
 @pytest.fixture
 def cy_account_password(site_parameters):
-    return site_parameters['account_password']
+    return site_parameters["account_password"]
 
 
 @pytest.fixture
 def cy_asset(site_parameters):
-    return site_parameters['asset']
+    return site_parameters["asset"]
 
 
 @pytest.fixture
 def cy_wrong_account(site_parameters):
-    return site_parameters['wrong_account']
+    return site_parameters["wrong_account"]
 
 
 @pytest.fixture
 def cy_config(site_parameters):
-    yield dedent("""
+    yield dedent(
+        """
         [cyberark]
         address = {address}
         use_credential=explicit
         username = {username}
         password = {password}
     """.format(
-        address=site_parameters['address'],
-        username=site_parameters['username'],
-        password=site_parameters['password']
-    ))
+            address=site_parameters["address"],
+            username=site_parameters["username"],
+            password=site_parameters["password"],
+        )
+    )
