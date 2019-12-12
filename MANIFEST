@@ -4,3 +4,5 @@ name: SPS_cyberark
 description: One Identity Safeguard for Privileged Sessions Cyberark Vault plugin
 version: 1.1.0
 entry_point: main.py
+author_name: One Identity PAM Integration Team
+author_email: QDL.QBU-OI.RD.Safeguard.Integration@oneidentity.com
