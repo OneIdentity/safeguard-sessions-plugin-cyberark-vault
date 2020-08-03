@@ -28,11 +28,11 @@ from collections import namedtuple
 from textwrap import dedent
 from contextlib import contextmanager
 
-from ..client import AuthenticatorFactory, Client, CyberarkException, V9Authenticator
-from safeguard.sessions.plugin.exceptions import PluginSDKRuntimeError
-from safeguard.sessions.plugin.plugin_configuration import PluginConfiguration, RequiredConfigurationSettingNotFound
+from ..client import AuthenticatorFactory, Client, V9Authenticator
+from safeguard.sessions.plugin.plugin_configuration import PluginConfiguration
+from safeguard.sessions.plugin.endpoint_extractor import EndpointException
 
-Response = namedtuple("Response", "ok text")
+Response = namedtuple("Response", "ok text status_code")
 
 ASSET = "1.2.3.4"
 ACCOUNT_ID = "12_3"
@@ -61,12 +61,13 @@ GET_RESPONSE = Response(
         }
     ),
     ok=True,
+    status_code=200,
 )
 
 POST_RESPONSES = [
-    Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True),
-    Response(text=json.dumps(ACCOUNT_PASSWORD), ok=True),
-    Response(text="", ok=True),
+    Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True, status_code=200),
+    Response(text=json.dumps(ACCOUNT_PASSWORD), ok=True, status_code=200),
+    Response(text="", ok=True, status_code=200),
 ]
 
 ADDRESS = "cyberark.host"
@@ -120,8 +121,11 @@ AUTH_HEADERS = {"Authorization": LOGON_TOKEN, "Content-Type": "application/json"
 HEADERS = {"Content-Type": "application/json"}
 
 AUTH_FAIL_MESSAGE = "Authentication failure."
-AUTH_FAIL_RESPONSE = Response(text=json.dumps({"ErrorCode": "ITATS004E", "ErrorMessage": AUTH_FAIL_MESSAGE}), ok=False)
-NO_OBJECTS_FOUND_RESPONSE = Response(text=json.dumps({"value": [], "count": 0}), ok=True)
+AUTH_FAIL_RESPONSE = Response(
+    text=json.dumps({"ErrorCode": "ITATS004E", "ErrorMessage": AUTH_FAIL_MESSAGE}),
+    ok=False,
+    status_code=403)
+NO_OBJECTS_FOUND_RESPONSE = Response(text=json.dumps({"value": [], "count": 0}), ok=True, status_code=200)
 
 
 @contextmanager
@@ -150,7 +154,7 @@ def test_client_uses_https_when_tls_is_enabled(_requests_tls, _authenticator_cre
     mocker.spy(Client, "__init__")
     client = Client.create(config, None, None)
     client.__init__.assert_called_with(
-        client, REQUESTS_TLS, https_url, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR
+        client, REQUESTS_TLS, https_url, None, None, DEFAULT_AUTHENTICATOR
     )
 
 
@@ -171,12 +175,12 @@ def test_get_password_based_on_username_and_asset():
     SESSION.post.side_effect = POST_RESPONSES
     SESSION.get.return_value = GET_RESPONSE
     expected_calls_to_post = [
-        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA),
-        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA),
+        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
         call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
     ]
     expected_call_to_get = [
-        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS),
+        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
     ]
 
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
@@ -189,7 +193,7 @@ def test_get_password_based_on_username_and_asset():
 
 def test_if_object_search_returns_multiple_objects_get_secret_returns_multiple_secrets():
     SESSION.post.side_effect = (
-        POST_RESPONSES[:-1] + [Response(text=json.dumps(ACCOUNT_PASSWORD_2), ok=True)] + POST_RESPONSES[-1:]
+        POST_RESPONSES[:-1] + [Response(text=json.dumps(ACCOUNT_PASSWORD_2), ok=True, status_code=200)] + POST_RESPONSES[-1:]
     )
     SESSION.get.return_value = Response(
         text=json.dumps(
@@ -202,15 +206,16 @@ def test_if_object_search_returns_multiple_objects_get_secret_returns_multiple_s
             }
         ),
         ok=True,
+        status_code=200
     )
     expected_calls_to_post = [
-        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA),
-        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA),
-        call(GET_PASSWORD_2_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA),
+        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+        call(GET_PASSWORD_2_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
         call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
     ]
     expected_call_to_get = [
-        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS),
+        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
     ]
 
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
@@ -235,9 +240,10 @@ def test_username_and_asset_gets_verified():
             }
         ),
         ok=True,
+        status_code=200
     )
-    expected_call_to_post = [call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA)]
-    expected_call_to_get = [call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS)]
+    expected_call_to_post = [call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None)]
+    expected_call_to_get = [call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None)]
 
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
     password = client.get_passwords(ACCOUNT_USERNAME, ASSET, GATEWAY_USERNAME)
@@ -250,15 +256,15 @@ def test_username_and_asset_gets_verified():
 def test_cannot_connect_to_vault():
     SESSION.post.side_effect = [ConnectionError()]
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    with raises(CyberarkException) as exc:
+    with raises(EndpointException) as exc:
         client.get_passwords(account="dummy", asset="1.2.3.4", gateway_username="dummy")
-    assert "Connection error:" in str(exc.value)
+    assert "Connection error: " in str(exc.value)
 
 
 def test_cannot_authenticate():
     SESSION.post.side_effect = [AUTH_FAIL_RESPONSE]
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    with raises(CyberarkException) as exc:
+    with raises(EndpointException) as exc:
         client.get_passwords(account="dummy", asset="1.2.3.4", gateway_username="dummy")
     assert AUTH_FAIL_MESSAGE in str(exc.value)
 
@@ -268,82 +274,3 @@ def test_cannot_find_object_based_on_username_and_asset():
     SESSION.get.return_value = NO_OBJECTS_FOUND_RESPONSE
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
     assert client.get_passwords(account="dummy", asset="1.2.3.4", gateway_username="dummy") == {"passwords": []}
-
-
-def test_userpass_calc_default():
-    config = PluginConfiguration("")
-    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
-    assert (username, password) == ("a_gateway_user", "a_gateway_password")
-
-
-def test_userpass_calc_gateway():
-    config = PluginConfiguration(
-        dedent(
-            """
-        [cyberark]
-        use_credential=gateway
-        username=admin_user
-        password=admin_pwd
-    """
-        )
-    )
-    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
-    assert (username, password) == ("a_gateway_user", "a_gateway_password")
-
-
-def test_userpass_calc_gateway_missing_password():
-    config = PluginConfiguration(
-        dedent(
-            """
-        [cyberark]
-        use_credential=gateway
-        username=admin_user
-        password=admin_pwd
-    """
-        )
-    )
-    with raises(PluginSDKRuntimeError):
-        Client.get_username_password(config, "a_gateway_user", "")
-
-
-def test_userpass_calc_explicit():
-    config = PluginConfiguration(
-        dedent(
-            """
-        [cyberark]
-        use_credential = explicit
-        username = admin_user
-        password = admin_password
-    """
-        )
-    )
-    (username, password) = Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
-    assert (username, password) == ("admin_user", "admin_password")
-
-
-def test_userpass_calc_explicit_missing_user():
-    config = PluginConfiguration(
-        dedent(
-            """
-        [cyberark]
-        use_credential = explicit
-        password = admin_password
-    """
-        )
-    )
-    with raises(RequiredConfigurationSettingNotFound):
-        Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
-
-
-def test_userpass_calc_explicit_missing_pwd():
-    config = PluginConfiguration(
-        dedent(
-            """
-        [cyberark]
-        use_credential = explicit
-        username = admin_user
-    """
-        )
-    )
-    with raises(RequiredConfigurationSettingNotFound):
-        Client.get_username_password(config, "a_gateway_user", "a_gateway_password")
