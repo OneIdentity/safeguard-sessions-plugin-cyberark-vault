@@ -20,17 +20,12 @@
 # IN THE SOFTWARE.
 #
 import abc
-import json
 import requests
-from safeguard.sessions.plugin.exceptions import PluginSDKRuntimeError
 from safeguard.sessions.plugin.requests_tls import RequestsTLS
 from safeguard.sessions.plugin.logging import get_logger
+from safeguard.sessions.plugin.endpoint_extractor import EndpointExtractor
 
 logger = get_logger(__name__)
-
-
-class CyberarkException(Exception):
-    pass
 
 
 class Client:
@@ -40,15 +35,14 @@ class Client:
         self.__username = username
         self.__password = password
         self.__authenticator = authenticator
+        self.__endpoint_extractor = EndpointExtractor(self.__address_url)
 
     @classmethod
-    def create(cls, config, gateway_username, gateway_password):
+    def create(cls, config, username, password):
         requests_tls = RequestsTLS.from_config(config)
         address_url = "{}://{}".format(
             "https" if requests_tls.tls_enabled else "http", config.get("cyberark", "address", required=True)
         )
-
-        (username, password) = cls.get_username_password(config, gateway_username, gateway_password)
 
         return Client(
             requests_tls=requests_tls,
@@ -57,23 +51,6 @@ class Client:
             password=password,
             authenticator=AuthenticatorFactory.create(config),
         )
-
-    @classmethod
-    def get_username_password(cls, config, gateway_username, gateway_password):
-        use_credential = config.getienum("cyberark", "use_credential", ("explicit", "gateway"), default="gateway")
-        if use_credential == "explicit":
-            return config.get("cyberark", "username", required=True), config.get("cyberark", "password", required=True)
-        else:
-            if gateway_username and gateway_password:
-                return gateway_username, gateway_password
-            else:
-                raise PluginSDKRuntimeError(
-                    "Gateway username or password undefined and use_credentials is set to gateway",
-                    {
-                        "gateway_username": "N/A" if not gateway_username else gateway_username,
-                        "gateway_password": "N/A" if not gateway_password else "(hidden)",
-                    },
-                )
 
     def get_passwords(self, account, asset, gateway_username):
         with self.__requests_tls.open_session() as session:
@@ -86,17 +63,12 @@ class Client:
 
     def __get_passwords(self, session, auth_token, account, asset, gateway_username):
         headers = {"Content-Type": "application/json", "Authorization": auth_token}
-        found_objects = _extract_data_from_endpoint(
+        found_objects = self.__endpoint_extractor.extract_data_from_endpoint(
             session,
-            endpoint_url=(
-                self.__address_url
-                + "/PasswordVault/api/Accounts?search="
-                + ",".join([account, asset])
-                + "&sort=UserName"
-            ),
+            endpoint_url="PasswordVault/api/Accounts?search={}&sort=UserName".format(",".join([account, asset])),
+            data_path="value",
             headers=headers,
             method="get",
-            field_name="value",
         )
         found_objects = list(
             filter(lambda x: (account == x.get("userName") and asset == x.get("address")), found_objects)
@@ -116,35 +88,22 @@ class Client:
             "Machine": asset,
         }
         endpoint_urls = [
-            self.__address_url + "/PasswordVault/api/Accounts/" + found_object.get("id") + "/Password/Retrieve"
+            "PasswordVault/api/Accounts/" + found_object.get("id") + "/Password/Retrieve"
             for found_object in found_objects
         ]
         return {
             "passwords": [
-                _extract_data_from_endpoint(session, endpoint_url, headers, "post", None, pwd_post_data)
+                self.__endpoint_extractor.extract_data_from_endpoint(
+                    session,
+                    endpoint_url,
+                    data_path=None,
+                    headers=headers,
+                    method="post",
+                    data=pwd_post_data
+                )
                 for endpoint_url in endpoint_urls
             ]
         }
-
-
-def _extract_data_from_endpoint(session, endpoint_url, headers, method, field_name=None, data=None):
-    logger.debug('Sending http request to CyberArk Vault, endpoint_url="{}", method="{}"'.format(endpoint_url, method))
-    try:
-        response = (
-            session.get(endpoint_url, headers=headers)
-            if method == "get"
-            else session.post(endpoint_url, headers=headers, data=json.dumps(data) if data else None)
-        )
-    except requests.exceptions.ConnectionError as exc:
-        raise CyberarkException("Connection error: {}".format(exc))
-    if response.ok:
-        logger.debug("Got correct response from endpoint: {}".format(endpoint_url))
-        content = json.loads(response.text)
-        return content.get(field_name) if field_name else content
-    else:
-        raise CyberarkException(
-            "Received error from CyberArk Vault: {}".format(json.loads(response.text).get("ErrorMessage"))
-        )
 
 
 class AuthenticatorFactory:
@@ -199,12 +158,12 @@ class V9Authenticator(Authenticator):
             "useRadiusAuthentication": False,
             "connectionNumber": "1",
         }
-        self._authorization = _extract_data_from_endpoint(
+        self._authorization = EndpointExtractor().extract_data_from_endpoint(
             session,
             endpoint_url=base_url + "/PasswordVault/WebServices/auth/Cyberark/CyberArkAuthenticationService.svc/Logon",
             headers={"Content-Type": "application/json"},
             method="post",
-            field_name="CyberArkLogonResult",
+            data_path="CyberArkLogonResult",
             data=auth_post_data,
         )
         return self._authorization
@@ -221,8 +180,9 @@ class V10Authenticator(Authenticator):
 
     def authenticate(self, session, base_url, username, password):
         auth_post_data = {"username": username, "password": password}
-        self._authorization = _extract_data_from_endpoint(
+        self._authorization = EndpointExtractor().extract_data_from_endpoint(
             session,
+            data_path=None,
             endpoint_url=base_url + "/PasswordVault/API/Auth/{}/Logon".format(self.TYPE_TO_ENDPOINT[self._type]),
             headers={"Content-Type": "application/json"},
             method="post",

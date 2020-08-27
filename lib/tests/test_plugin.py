@@ -43,30 +43,16 @@ def configured_plugin():
 
 
 @patch("lib.client.Client.get_passwords", return_value={"passwords": ["password"]})
-def test_do_get_password_list(client, configured_plugin):
+def test_do_get_password_list(client, configured_plugin, connection_parameters):
     username = "wsmith"
     server = "1.2.3.4"
     gateway_user = "jsmith"
-    password_list = configured_plugin.get_password_list(
-        cookie=dict(),
-        session_cookie=dict(),
-        target_username=username,
-        target_server=server,
-        gateway_username=gateway_user,
-        protocol="SSH",
-    )
+    password_list = configured_plugin.get_password_list(**connection_parameters(username, server, gateway_user))
     client.assert_called_with(username, server, gateway_user)
     assert_plugin_hook_result(password_list, dict(cookie=dict(account=username, asset=server), passwords=["password"]))
 
 
 @patch("lib.client.Client.get_passwords", return_value=[])
-def test_getting_password_for_unknown_user(_client, configured_plugin):
-    password_list = configured_plugin.get_password_list(
-        cookie=dict(),
-        session_cookie=dict(),
-        target_username="unknown",
-        target_server="unknown",
-        gateway_username="unknown",
-        protocol="SSH",
-    )
+def test_getting_password_for_unknown_user(client, configured_plugin, connection_parameters):
+    password_list = configured_plugin.get_password_list(**connection_parameters())
     assert_plugin_hook_result(password_list, dict(cookie=dict(account=None, asset=None), passwords=[]))

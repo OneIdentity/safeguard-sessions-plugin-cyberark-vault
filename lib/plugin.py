@@ -26,10 +26,13 @@ from .client import Client
 
 
 class Plugin(CredentialStorePlugin):
+    def __init__(self, configuration):
+        super().__init__(configuration, configuration_section="cyberark")
+
     def do_get_password_list(self):
         try:
             vault_client = Client.create(
-                self.plugin_configuration, self.connection.gateway_username, self.connection.gateway_password
+                self.plugin_configuration, self.authentication_username, self.authentication_password
             )
             return vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
         except (PluginSDKRuntimeError, RequestException) as ex:

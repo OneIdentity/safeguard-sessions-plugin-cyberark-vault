@@ -24,38 +24,46 @@ from ..plugin import Plugin
 from safeguard.sessions.plugin_impl.test_utils.plugin import assert_plugin_hook_result
 
 
-def test_cyberark_integration(cy_config, cy_account, cy_asset, cy_account_password):
+def test_cyberark_integration(cy_config, cy_account, cy_asset, cy_account_password, connection_parameters):
     plugin = Plugin(cy_config)
 
     result = plugin.get_password_list(
-        cookie={}, session_cookie={}, target_username=cy_account, target_server=cy_asset, protocol="SSH"
+        **connection_parameters(server_uname=cy_account, server_ip=cy_asset)
     )
 
     assert_plugin_hook_result(result, {"passwords": [cy_account_password]})
 
 
-def test_cyberark_integration_wrong_user(cy_config, cy_wrong_account, cy_asset):
+def test_cyberark_integration_wrong_user(cy_config, cy_wrong_account, cy_asset, connection_parameters):
     plugin = Plugin(cy_config)
 
     result = plugin.get_password_list(
-        cookie={}, session_cookie={}, target_username=cy_wrong_account, target_server=cy_asset, protocol="SSH"
+        **connection_parameters(server_uname=cy_wrong_account, server_ip=cy_asset)
     )
 
     assert_plugin_hook_result(result, {"passwords": []})
 
 
-def test_v10_user_logon(cy_config, cy_account, cy_asset, cy_account_password):
+def test_v10_user_logon(cy_config, cy_account, cy_asset, cy_account_password, connection_parameters):
     config = cy_config + "\nauthentication_method=cyberark"
     plugin = Plugin(config)
 
     result = plugin.get_password_list(
-        cookie={}, session_cookie={}, target_username=cy_account, target_server=cy_asset, protocol="SSH"
+        **connection_parameters(server_uname=cy_account, server_ip=cy_asset)
     )
 
     assert_plugin_hook_result(result, {"passwords": [cy_account_password]})
 
 
-def test_v10_ldap_logon(cy_address, cy_ldap_username, cy_ldap_password, cy_account, cy_asset, cy_account_password):
+def test_v10_ldap_logon(
+        cy_address,
+        cy_ldap_username,
+        cy_ldap_password,
+        cy_account,
+        cy_asset,
+        cy_account_password,
+        connection_parameters
+):
     config = dedent(
         """
         [cyberark]
@@ -71,7 +79,7 @@ def test_v10_ldap_logon(cy_address, cy_ldap_username, cy_ldap_password, cy_accou
     plugin = Plugin(config)
 
     result = plugin.get_password_list(
-        cookie={}, session_cookie={}, target_username=cy_account, target_server=cy_asset, protocol="SSH"
+        **connection_parameters(server_uname=cy_account, server_ip=cy_asset)
     )
 
     assert_plugin_hook_result(result, {"passwords": [cy_account_password]})

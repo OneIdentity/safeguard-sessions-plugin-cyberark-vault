@@ -83,3 +83,26 @@ def cy_config(site_parameters):
             password=site_parameters["password"],
         )
     )
+
+
+@pytest.fixture
+def connection_parameters():
+    def wrapper(server_uname="unknown", server_hname="unknown", gateway_uname="unknown", server_ip="unknown"):
+        return dict(
+            cookie=dict(),
+            session_cookie=dict(),
+            server_username=server_uname,
+            server_hostname=server_hname,
+            gateway_username=gateway_uname,
+            protocol="SSH",
+            session_id="the_id",
+            client_ip="1.2.3.4",
+            client_hostname="client_host",
+            gateway_domain="gateway.domain",
+            gateway_password="unknown",
+            gateway_groups=[],
+            server_domain="acme.com",
+            server_ip=server_ip,
+            server_port=22,
+        )
+    return wrapper
