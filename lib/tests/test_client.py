@@ -21,6 +21,7 @@
 #
 
 import json
+import pytest
 from requests.exceptions import ConnectionError
 from pytest import raises
 from unittest.mock import patch, call, MagicMock
@@ -171,84 +172,241 @@ def test_client_uses_gateway_user_when_configured(_requests_tls, _authenticator_
     )
 
 
-def test_get_password_based_on_username_and_asset():
-    SESSION.post.side_effect = POST_RESPONSES
-    SESSION.get.return_value = GET_RESPONSE
-    expected_calls_to_post = [
-        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
-        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
-        call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
-    ]
-    expected_call_to_get = [
-        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
-    ]
-
-    client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    password = client.get_passwords(ACCOUNT_USERNAME, ASSET, GATEWAY_USERNAME)
-
-    assert password == {"passwords": [ACCOUNT_PASSWORD]}
-    SESSION.get.assert_has_calls(calls=expected_call_to_get, any_order=False)
-    SESSION.post.assert_has_calls(calls=expected_calls_to_post, any_order=False)
-
-
-def test_if_object_search_returns_multiple_objects_get_secret_returns_multiple_secrets():
-    SESSION.post.side_effect = (
-        POST_RESPONSES[:-1] + [Response(text=json.dumps(ACCOUNT_PASSWORD_2), ok=True, status_code=200)] + POST_RESPONSES[-1:]
+password_test_data = [
+    (
+        POST_RESPONSES,
+        [
+            {
+                "id": ACCOUNT_ID,
+                "name": f"Database-Oracle-{ASSET}-{ACCOUNT_USERNAME}",
+                "address": ASSET,
+                "userName": ACCOUNT_USERNAME,
+                "platformId": "Oracle",
+                "safeName": "DatabaseAccounts",
+                "secretType": "password",
+            }
+        ],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [
+            call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
+        ],
+        [ACCOUNT_PASSWORD]
+    ),
+    (
+        POST_RESPONSES[:-1] + [Response(text=json.dumps(ACCOUNT_PASSWORD_2), ok=True, status_code=200)] + POST_RESPONSES[-1:],
+        [
+            {"id": ACCOUNT_ID, "address": ASSET, "userName": ACCOUNT_USERNAME, "secretType": "password"},
+            {"id": ACCOUNT_ID_2, "address": ASSET, "userName": ACCOUNT_USERNAME, "secretType": "password" },
+        ],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(GET_PASSWORD_2_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [
+            call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
+        ],
+        [ACCOUNT_PASSWORD, ACCOUNT_PASSWORD_2]
+    ),
+    (
+        POST_RESPONSES,
+        [
+            {"id": "id1", "address": "not-the-asset", "userName": "not-the-username", "secretType": "password"},
+            {"id": "id2", "address": ASSET, "userName": "not-the-username", "secretType": "password"},
+            {"id": "id3", "address": "not-the-asset", "userName": ACCOUNT_USERNAME, "secretType": "password"},
+        ],
+        [call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None)],
+        [call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None)],
+        []
     )
+]
+
+password_test_ids = [
+    "get_password_based_on_username_and_asset",
+    "object_search_returns_multiple_objects_get_secret_returns_multiple_secrets",
+    "username_and_asset_gets_verified"
+
+]
+
+
+@pytest.mark.parametrize("post_se,get_rv,expected_call_to_post,expected_call_to_get,expected_result", password_test_data, ids=password_test_ids)
+def test_password_retreiving(post_se, get_rv, expected_call_to_post, expected_call_to_get, expected_result):
+    SESSION.get.mock_calls = []
+    SESSION.post.mock_calls = []
     SESSION.get.return_value = Response(
         text=json.dumps(
             {
-                "value": [
-                    {"id": ACCOUNT_ID, "address": ASSET, "userName": ACCOUNT_USERNAME},
-                    {"id": ACCOUNT_ID_2, "address": ASSET, "userName": ACCOUNT_USERNAME},
-                ],
-                "count": 2,
+                "value": get_rv,
+                "count": len(get_rv),
             }
         ),
         ok=True,
-        status_code=200
+        status_code=200,
     )
-    expected_calls_to_post = [
-        call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
-        call(GET_PASSWORD_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
-        call(GET_PASSWORD_2_ENDPOINT, headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
-        call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
-    ]
-    expected_call_to_get = [
-        call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None),
-    ]
+    SESSION.post.side_effect = post_se
 
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    passwords = client.get_passwords(ACCOUNT_USERNAME, ASSET, GATEWAY_USERNAME)
-
-    assert passwords == {"passwords": [ACCOUNT_PASSWORD, ACCOUNT_PASSWORD_2]}
+    result = client.get_passwords(ACCOUNT_USERNAME, ASSET, GATEWAY_USERNAME)
+    assert result == expected_result
     SESSION.get.assert_has_calls(calls=expected_call_to_get, any_order=False)
-    SESSION.post.assert_has_calls(calls=expected_calls_to_post, any_order=False)
+    SESSION.post.assert_has_calls(calls=expected_call_to_post, any_order=False)
 
 
-def test_username_and_asset_gets_verified():
-    SESSION.post.side_effect = POST_RESPONSES
+KEY1 = """-----BEGIN RSA PRIVATE KEY-----
+    key1
+    -----END RSA PRIVATE KEY-----"""
+
+KEY2 = """-----BEGIN RSA PRIVATE KEY-----
+    key2
+    -----END RSA PRIVATE KEY-----"""
+
+ACCOUNT_WITH_KEY = "user_with_key"
+
+keys_test_data = [
+    (
+        [
+            Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True, status_code=200),
+            Response(text=KEY1, ok=True, status_code=200),
+            Response(text=KEY2, ok=True, status_code=200),
+            Response(text="", ok=True, status_code=200),
+        ],
+        [
+            {
+                "id": "67_9",
+                "name": f"Operating System-UnixSSHKeys-{ASSET}-{ACCOUNT_WITH_KEY}",
+                "address": ASSET,
+                "userName": ACCOUNT_WITH_KEY,
+                "platformId": "UnixSSHKeys",
+                "safeName": "UnixAccounts_SSHKeys",
+                "secretType": "key",
+            },
+            {
+                "id": "67_10",
+                "name": f"Operating System-UnixSSHKeys-{ASSET}-{ACCOUNT_WITH_KEY}",
+                "address": ASSET,
+                "userName": ACCOUNT_WITH_KEY,
+                "platformId": "UnixSSHKeys",
+                "safeName": "UnixAccounts_SSHKeys",
+                "secretType": "key",
+            }
+        ],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(URL + "/PasswordVault/api/Accounts/67_9/Password/Retrieve", headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(URL + "/PasswordVault/api/Accounts/67_10/Password/Retrieve", headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [call(URL + "/PasswordVault/api/Accounts?search=" + ",".join([ACCOUNT_WITH_KEY, ASSET]) + "&sort=UserName", headers=AUTH_HEADERS, params=None)],
+        [KEY1, KEY2]
+    ),
+    (
+        [
+            Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True, status_code=200),
+            Response(text=KEY1, ok=True, status_code=200),
+            Response(text="", ok=True, status_code=200),
+        ],
+        [
+            {
+                "id": "67_9",
+                "name": f"Operating System-UnixSSHKeys-{ASSET}-{ACCOUNT_WITH_KEY}",
+                "address": ASSET,
+                "userName": ACCOUNT_WITH_KEY,
+                "platformId": "UnixSSHKeys",
+                "safeName": "UnixAccounts_SSHKeys",
+                "secretType": "key",
+            }
+        ],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(URL + "/PasswordVault/api/Accounts/67_9/Password/Retrieve", headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [call(URL + "/PasswordVault/api/Accounts?search=" + ",".join([ACCOUNT_WITH_KEY, ASSET]) + "&sort=UserName", headers=AUTH_HEADERS, params=None)],
+        [KEY1]
+    ),
+    (
+        [
+            Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True, status_code=200),
+            Response(text=KEY1, ok=True, status_code=200),
+            Response(text="", ok=True, status_code=200),
+        ],
+        [
+            {
+                "id": "67_9",
+                "name": f"Operating System-UnixSSHKeys-{ASSET}-{ACCOUNT_WITH_KEY}",
+                "address": ASSET,
+                "userName": ACCOUNT_WITH_KEY,
+                "platformId": "UnixSSHKeys",
+                "safeName": "UnixAccounts_SSHKeys",
+                "secretType": "key",
+            },
+            {
+                "id": ACCOUNT_ID,
+                "name": f"Database-Oracle-{ASSET}-{ACCOUNT_WITH_KEY}",
+                "address": ASSET,
+                "userName": ACCOUNT_WITH_KEY,
+                "platformId": "Oracle",
+                "safeName": "DatabaseAccounts",
+                "secretType": "password",
+            }
+        ],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(URL + "/PasswordVault/api/Accounts/67_9/Password/Retrieve", headers=AUTH_HEADERS, data=GET_PWD_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [call(URL + "/PasswordVault/api/Accounts?search=" + ",".join([ACCOUNT_WITH_KEY, ASSET]) + "&sort=UserName", headers=AUTH_HEADERS, params=None)],
+        [KEY1]
+    ),
+    (
+        [
+            Response(text=json.dumps({"CyberArkLogonResult": LOGON_TOKEN}), ok=True, status_code=200),
+            Response(text=KEY1, ok=True, status_code=200),
+            Response(text="", ok=True, status_code=200),
+        ],
+        [],
+        [
+            call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None),
+            call(LOGOFF_ENDPOINT, headers=AUTH_HEADERS),
+        ],
+        [call(URL + "/PasswordVault/api/Accounts?search=" + ",".join([ACCOUNT_WITH_KEY, ASSET]) + "&sort=UserName", headers=AUTH_HEADERS, params=None)],
+        []
+    ),
+]
+
+
+test_ids = [
+    "Retrieves more keys",
+    "Can retrieve keys",
+    "Retrieves only keys",
+    "No object found",
+]
+
+
+@pytest.mark.parametrize("post_se,get_rv,expected_call_to_post,expected_call_to_get,expected_result", keys_test_data, ids=test_ids)
+def test_ssh_key_retrieve(post_se, get_rv, expected_call_to_post, expected_call_to_get, expected_result):
+    SESSION.get.mock_calls = []
+    SESSION.post.mock_calls = []
     SESSION.get.return_value = Response(
         text=json.dumps(
             {
-                "value": [
-                    {"id": "id1", "address": "not-the-asset", "userName": "not-the-username"},
-                    {"id": "id2", "address": ASSET, "userName": "not-the-username"},
-                    {"id": "id3", "address": "not-the-asset", "userName": ACCOUNT_USERNAME},
-                ],
-                "count": 3,
+                "value": get_rv,
+                "count": len(get_rv),
             }
         ),
         ok=True,
-        status_code=200
+        status_code=200,
     )
-    expected_call_to_post = [call(LOGON_ENDPOINT, headers=HEADERS, data=LOGON_POST_DATA, params=None)]
-    expected_call_to_get = [call(GET_ACCOUNTS_ENDPOINT, headers=AUTH_HEADERS, params=None)]
+    SESSION.post.side_effect = post_se
 
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    password = client.get_passwords(ACCOUNT_USERNAME, ASSET, GATEWAY_USERNAME)
-
-    assert password == {"passwords": []}
+    result = client.get_ssh_keys(ACCOUNT_WITH_KEY, ASSET, GATEWAY_USERNAME)
+    assert result == expected_result
     SESSION.get.assert_has_calls(calls=expected_call_to_get, any_order=False)
     SESSION.post.assert_has_calls(calls=expected_call_to_post, any_order=False)
 
@@ -273,4 +431,4 @@ def test_cannot_find_object_based_on_username_and_asset():
     SESSION.post.side_effect = POST_RESPONSES
     SESSION.get.return_value = NO_OBJECTS_FOUND_RESPONSE
     client = Client(REQUESTS_TLS, "http://" + ADDRESS, VAULT_USERNAME, VAULT_PASSWORD, DEFAULT_AUTHENTICATOR)
-    assert client.get_passwords(account="dummy", asset="1.2.3.4", gateway_username="dummy") == {"passwords": []}
+    assert client.get_passwords(account="dummy", asset="1.2.3.4", gateway_username="dummy") == []

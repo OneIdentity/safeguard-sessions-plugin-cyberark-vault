@@ -41,8 +41,11 @@ def configured_plugin():
     )
     return Plugin(config)
 
+KEY = """-----BEGIN RSA PRIVATE KEY-----
+    key1
+    -----END RSA PRIVATE KEY-----"""
 
-@patch("lib.client.Client.get_passwords", return_value={"passwords": ["password"]})
+@patch("lib.client.Client.get_passwords", return_value=["password"])
 def test_do_get_password_list(client, configured_plugin, connection_parameters):
     username = "wsmith"
     server = "1.2.3.4"
@@ -56,3 +59,19 @@ def test_do_get_password_list(client, configured_plugin, connection_parameters):
 def test_getting_password_for_unknown_user(client, configured_plugin, connection_parameters):
     password_list = configured_plugin.get_password_list(**connection_parameters())
     assert_plugin_hook_result(password_list, dict(cookie=dict(account=None, asset=None), passwords=[]))
+
+
+@patch("lib.client.Client.get_ssh_keys", return_value=[KEY])
+def test_getting_private_keys(client, configured_plugin, connection_parameters):
+    username = "wsmith"
+    server = "1.2.3.4"
+    gateway_user = "jsmith"
+    private_key_list = configured_plugin.get_private_key_list(**connection_parameters(username, server, gateway_user))
+    client.assert_called_with(username, server, gateway_user)
+    assert_plugin_hook_result(private_key_list, dict(cookie=dict(account=username, asset=server), private_keys=[("ssh-rsa", KEY)]))
+
+
+@patch("lib.client.Client.get_ssh_keys", return_value=[])
+def test_getting_private_key_for_unknown_user(client, configured_plugin, connection_parameters):
+    private_key_list = configured_plugin.get_private_key_list(**connection_parameters())
+    assert_plugin_hook_result(private_key_list, dict(cookie=dict(account=None, asset=None), private_keys=[]))

@@ -34,7 +34,28 @@ class Plugin(CredentialStorePlugin):
             vault_client = Client.create(
                 self.plugin_configuration, self.authentication_username, self.authentication_password
             )
-            return vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
+            passwords = vault_client.get_passwords(self.account, self.asset, self.connection.gateway_username)
+            return  {"passwords": passwords}
         except (PluginSDKRuntimeError, RequestException) as ex:
-            self.logger.error("Error retrieving passwords: {}".format(ex))
+            self.logger.error("Error retrieving passwords: %s", ex)
+            return None
+
+    def do_get_private_key_list(self):
+        try:
+            vault_client = Client.create(
+                self.plugin_configuration, self.authentication_username, self.authentication_password
+            )
+            keys = vault_client.get_ssh_keys(self.account, self.asset, self.connection.gateway_username)
+            return {
+                "private_keys": [
+                    type_key for type_key in
+                    [
+                        (self.determine_key_type(key), key)
+                        for key in keys
+                    ]
+                    if type_key[0]
+                ]
+            }
+        except (PluginSDKRuntimeError, RequestException) as ex:
+            self.logger.error("Error retrieving private keys: %s", ex)
             return None
