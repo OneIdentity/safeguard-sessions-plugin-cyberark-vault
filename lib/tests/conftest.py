@@ -57,6 +57,14 @@ def cy_account(site_parameters):
 def cy_account_password(site_parameters):
     return site_parameters["account_password"]
 
+@pytest.fixture
+def cy_account_with_key(site_parameters):
+    return site_parameters["account_with_key"]
+
+
+@pytest.fixture
+def cy_account_private_key(site_parameters):
+    return site_parameters["account_key"]
 
 @pytest.fixture
 def cy_asset(site_parameters):
