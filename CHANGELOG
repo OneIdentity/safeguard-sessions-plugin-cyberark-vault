@@ -1,4 +1,6 @@
-2.0.0 2020-08-05
+2.0.0 2021-02-12
+
+Add ability to checkout ssh keys from the vault
 
 Use new credential store base class features to make plugin code easier to maintain
 
