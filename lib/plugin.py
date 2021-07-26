@@ -59,3 +59,14 @@ class Plugin(CredentialStorePlugin):
         except (PluginSDKRuntimeError, RequestException) as ex:
             self.logger.error("Error retrieving private keys: %s", ex)
             return None
+
+    def do_get_remote_app_credentials(self):
+        try:
+            vault_client = Client.create(
+                self.plugin_configuration, self.authentication_username, self.authentication_password
+            )
+            passwords = vault_client.get_database_passwords(self.remote_app_account, self.remote_app_asset, 'autologon')
+            return  {"passwords": passwords}
+        except (PluginSDKRuntimeError, RequestException) as ex:
+            self.logger.error("Error retrieving passwords: %s", ex)
+            return None

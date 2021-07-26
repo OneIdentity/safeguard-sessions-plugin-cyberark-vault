@@ -107,6 +107,32 @@ class Client:
                         keys.append(response.text.strip("\""))
                 return keys
 
+    def get_database_passwords(self, account, asset, gateway_username):
+        with self.__requests_tls.open_session() as session:
+            with self.__authenticator.authenticate(
+                session, self.__address_url, self.__username, self.__password
+            ) as auth_token:
+                passwords = []
+                found_objects = self.__search_for_account_asset_secrets(session, auth_token, account, asset)
+                logger.debug("Found the following secrets: %s", found_objects)
+                if len(found_objects) == 0:
+                    logger.debug(
+                        "No password found in vault for this account and/or asset: account=%s, asset=%s", account, asset
+                    )
+                    return passwords
+                secret_endpoints = self.__create_secret_endpoints(self.__is_db_password, found_objects, account, asset)
+                logger.debug("Will retrieve secrets from the following endpoints: %s", ",".join(secret_endpoints))
+                for se in secret_endpoints:
+                    logger.debug("Getting password from: %s", se)
+                    passwords.append(self.__endpoint_extractor.extract_data_from_endpoint(
+                        session,
+                        endpoint_url=se,
+                        headers=self.__make_headers(auth_token),
+                        method="post",
+                        data=self.__contruct_post_data(gateway_username, asset),
+                    ))
+                return passwords
+
     def __search_for_account_asset_secrets(self, session, auth_token, account, asset):
         return self.__endpoint_extractor.extract_data_from_endpoint(
             session,
@@ -135,6 +161,10 @@ class Client:
     @staticmethod
     def __is_ssh_key(found_object, account, asset):
         return (account == found_object.get("userName") and asset == found_object.get("address") and found_object.get("secretType") == "key")
+
+    @staticmethod
+    def __is_db_password(found_object, account, asset):
+        return (account == found_object.get("userName") and asset == found_object.get("platformAccountProperties", {}).get("Database") and found_object.get("secretType") == "password")
 
     @staticmethod
     def __contruct_post_data(gateway_user, asset):
